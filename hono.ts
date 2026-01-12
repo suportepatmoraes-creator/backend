@@ -6,45 +6,23 @@ import { createContext } from "./trpc/create-context";
 
 const app = new Hono();
 
+// 1. O CORS continua aqui, para todas as rotas
 app.use("*", cors());
 
+// 2. A rota de status vem antes do tRPC
 app.get("/", (c) => {
   return c.json({ status: "ok", message: "API is running" });
 });
 
-app.get("/api", (c) => {
-  return c.json({ status: "ok", message: "tRPC API is running" });
-});
-
-app.get("/api/debug/routes", (c) => {
-  return c.json({
-    availableRoutes: [
-      "GET /",
-      "GET /api",
-      "ALL /api/trpc/*",
-      "GET /api/debug/routes"
-    ],
-    message: "These are the available routes"
-  });
-});
-
-// Handle both GET and POST requests for tRPC
+// 3. O middleware do tRPC com o caminho CORRETO
 app.use(
-  "/api/trpc/*",
+  "/api/trpc/*", // O cliente vai chamar este caminho
   trpcServer({
     router: appRouter,
     createContext,
-    endpoint: "/api/trpc",
-    batching: {
-      enabled: false,
-    },
+    endpoint: "/api/trpc", // O endpoint interno precisa corresponder
   })
 );
 
-// For Vercel deployment
-export default {
-  fetch: app.fetch,
-};
+export default app;
 
-// Also export the app directly for other uses
-export { app };
