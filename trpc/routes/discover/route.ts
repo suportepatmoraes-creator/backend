@@ -45,11 +45,11 @@ export const getDiscoverDramasProcedure = protectedProcedure
       let allTvIds: number[] = [];
       let allMovieIds: number[] = [];
 
-      // Fetch TV Shows - Top rated and Popular (Global)
-      for (let page = 1; page <= 5; page++) {
+      // Fetch TV Shows - Top rated and Popular (Global) - 10 pages for variety
+      for (let page = 1; page <= 10; page++) {
         try {
           const [topRated, popular] = await Promise.all([
-            fetch(`https://api.themoviedb.org/3/discover/tv?api_key=${tmdbApiKey}&sort_by=vote_average.desc&page=${page}&vote_count.gte=20&with_runtime.gte=15`).then(r => r.json()),
+            fetch(`https://api.themoviedb.org/3/discover/tv?api_key=${tmdbApiKey}&sort_by=vote_average.desc&page=${page}&vote_count.gte=10&with_runtime.gte=10`).then(r => r.json()),
             fetch(`https://api.themoviedb.org/3/discover/tv?api_key=${tmdbApiKey}&sort_by=popularity.desc&page=${page}`).then(r => r.json())
           ]);
           allTvIds.push(...(topRated.results?.map((d: any) => d.id) || []));
@@ -59,11 +59,11 @@ export const getDiscoverDramasProcedure = protectedProcedure
         }
       }
 
-      // Fetch Movies - Top rated and Popular (Global)
-      for (let page = 1; page <= 5; page++) {
+      // Fetch Movies - Top rated and Popular (Global) - 10 pages for variety
+      for (let page = 1; page <= 10; page++) {
         try {
           const [topRated, popular] = await Promise.all([
-            fetch(`https://api.themoviedb.org/3/discover/movie?api_key=${tmdbApiKey}&sort_by=vote_average.desc&page=${page}&vote_count.gte=20`).then(r => r.json()),
+            fetch(`https://api.themoviedb.org/3/discover/movie?api_key=${tmdbApiKey}&sort_by=vote_average.desc&page=${page}&vote_count.gte=10`).then(r => r.json()),
             fetch(`https://api.themoviedb.org/3/discover/movie?api_key=${tmdbApiKey}&sort_by=popularity.desc&page=${page}`).then(r => r.json())
           ]);
           allMovieIds.push(...(topRated.results?.map((d: any) => d.id) || []));
@@ -85,6 +85,16 @@ export const getDiscoverDramasProcedure = protectedProcedure
         if (uniqueTvIds[i]) result.push({ id: uniqueTvIds[i], type: 'tv' });
         if (uniqueMovieIds[i]) result.push({ id: uniqueMovieIds[i], type: 'movie' });
         if (result.length >= input.limit) break;
+      }
+
+      // Fallback if no result (user has seen everything in current pool)
+      if (result.length === 0) {
+        console.log('No items available after filtering, using fallbacks');
+        const fallbackTv = [1399, 60625, 71446, 63174, 1416, 1396, 60059, 66732].filter(id => !tvExclusions.includes(id));
+        const fallbackMovies = [155, 27205, 157336, 680, 13, 122, 11, 240].filter(id => !movieExclusions.includes(id));
+
+        fallbackTv.forEach(id => result.push({ id, type: 'tv' }));
+        fallbackMovies.forEach(id => result.push({ id, type: 'movie' }));
       }
 
       console.log(`Returning ${result.length} discover items (${result.filter(r => r.type === 'tv').length} TV, ${result.filter(r => r.type === 'movie').length} Movie)`);
