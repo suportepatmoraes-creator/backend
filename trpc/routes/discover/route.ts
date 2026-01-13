@@ -1,120 +1,106 @@
 import { z } from 'zod';
 import { protectedProcedure } from '../../create-context';
 
-// Procedure para obter dramas pré-carregados para descobrir
+// Procedure para obter dramas e filmes pré-carregados para descobrir
 export const getDiscoverDramasProcedure = protectedProcedure
   .input(z.object({
     limit: z.number().min(1).max(50).default(30)
   }))
   .query(async ({ ctx, input }) => {
     try {
-      console.log(`Fetching discover dramas for user ${ctx.user.id}, limit: ${input.limit}`);
+      console.log(`Fetching discover content for user ${ctx.user.id}, limit: ${input.limit}`);
 
-      // Get user's drama lists to exclude (all statuses)
+      // Get user's drama/movie lists to exclude
       const { data: userLists, error: listsError } = await ctx.supabase
         .from('user_drama_lists')
-        .select('drama_id')
+        .select('drama_id, media_type')
         .eq('user_id', ctx.user.id);
 
       if (listsError) {
         console.error('Error fetching user lists:', listsError);
       }
 
-      const excludedDramaIds = userLists?.map(item => item.drama_id) || [];
-      console.log(`Found ${excludedDramaIds.length} dramas in user lists to exclude`);
+      // Filter by type for exclusion
+      const excludedTvIds = userLists?.filter(i => i.media_type === 'tv').map(item => item.drama_id) || [];
+      const excludedMovieIds = userLists?.filter(i => i.media_type === 'movie').map(item => item.drama_id) || [];
 
-      // Get skipped dramas that haven't expired
-      const { data: skippedDramas, error: skippedError } = await ctx.supabase
+      // Get skipped content
+      const { data: skippedData, error: skippedError } = await ctx.supabase
         .from('user_skipped_dramas')
-        .select('drama_id')
+        .select('drama_id, media_type')
         .eq('user_id', ctx.user.id)
         .gt('expires_at', new Date().toISOString());
 
       if (skippedError) {
-        console.error('Error fetching skipped dramas:', skippedError);
+        console.error('Error fetching skipped items:', skippedError);
       }
 
-      const skippedDramaIds = skippedDramas?.map(item => item.drama_id) || [];
-      console.log(`Found ${skippedDramaIds.length} skipped dramas to exclude`);
+      const skippedTvIds = skippedData?.filter(i => (i as any).media_type === 'tv' || !(i as any).media_type).map(item => item.drama_id) || [];
+      const skippedMovieIds = skippedData?.filter(i => (i as any).media_type === 'movie').map(item => item.drama_id) || [];
 
-      const allExcludedIds = [...excludedDramaIds, ...skippedDramaIds];
-      console.log(`Total excluded dramas: ${allExcludedIds.length}`);
+      const tvExclusions = [...excludedTvIds, ...skippedTvIds];
+      const movieExclusions = [...excludedMovieIds, ...skippedMovieIds];
 
-      // Fetch Korean dramas from TMDB API - Large pool and High Rating focus
       const tmdbApiKey = '8265bd1679663a7ea12ac168da84d2e8';
-      let allDramaIds: number[] = [];
+      let allTvIds: number[] = [];
+      let allMovieIds: number[] = [];
 
-      const countries = 'KR';
-
-      // Fetch high-rated KR dramas - Fetch 20 pages (400 dramas)
-      for (let page = 1; page <= 20; page++) {
+      // Fetch KR Dramas (TV) - Top rated and Popular
+      for (let page = 1; page <= 5; page++) {
         try {
-          const response = await fetch(
-            `https://api.themoviedb.org/3/discover/tv?api_key=${tmdbApiKey}&with_origin_country=${countries}&sort_by=vote_average.desc&page=${page}&vote_count.gte=50&with_runtime.gte=15`
-          );
-          if (response.ok) {
-            const data = await response.json();
-            const ids = data.results?.map((d: any) => d.id) || [];
-            allDramaIds.push(...ids);
-          }
+          const [topRated, popular] = await Promise.all([
+            fetch(`https://api.themoviedb.org/3/discover/tv?api_key=${tmdbApiKey}&with_origin_country=KR&sort_by=vote_average.desc&page=${page}&vote_count.gte=50&with_runtime.gte=15`).then(r => r.json()),
+            fetch(`https://api.themoviedb.org/3/discover/tv?api_key=${tmdbApiKey}&with_origin_country=KR&sort_by=popularity.desc&page=${page}&vote_average.gte=6.0`).then(r => r.json())
+          ]);
+          allTvIds.push(...(topRated.results?.map((d: any) => d.id) || []));
+          allTvIds.push(...(popular.results?.map((d: any) => d.id) || []));
         } catch (error) {
-          console.error(`Error fetching TMDB top_rated page ${page}:`, error);
+          console.error(`Error fetching TMDB TV page ${page}:`, error);
         }
       }
 
-      // Fetch popular KR dramas for even more variety - Fetch another 20 pages (400 dramas)
-      for (let page = 1; page <= 20; page++) {
+      // Fetch KR Movies - Top rated and Popular
+      for (let page = 1; page <= 5; page++) {
         try {
-          const response = await fetch(
-            `https://api.themoviedb.org/3/discover/tv?api_key=${tmdbApiKey}&with_origin_country=${countries}&sort_by=popularity.desc&page=${page}&vote_average.gte=6.0`
-          );
-          if (response.ok) {
-            const data = await response.json();
-            const ids = data.results?.map((d: any) => d.id) || [];
-            allDramaIds.push(...ids);
-          }
+          const [topRated, popular] = await Promise.all([
+            fetch(`https://api.themoviedb.org/3/discover/movie?api_key=${tmdbApiKey}&with_origin_country=KR&sort_by=vote_average.desc&page=${page}&vote_count.gte=50`).then(r => r.json()),
+            fetch(`https://api.themoviedb.org/3/discover/movie?api_key=${tmdbApiKey}&with_origin_country=KR&sort_by=popularity.desc&page=${page}&vote_average.gte=6.0`).then(r => r.json())
+          ]);
+          allMovieIds.push(...(topRated.results?.map((d: any) => d.id) || []));
+          allMovieIds.push(...(popular.results?.map((d: any) => d.id) || []));
         } catch (error) {
-          console.error(`Error fetching TMDB popular page ${page}:`, error);
+          console.error(`Error fetching TMDB Movie page ${page}:`, error);
         }
       }
 
-      console.log(`Fetched total ${allDramaIds.length} Korean dramas from TMDB before filtering`);
+      // Remove duplicates and filter exclusions
+      const uniqueTvIds = [...new Set(allTvIds)].filter(id => !tvExclusions.includes(id));
+      const uniqueMovieIds = [...new Set(allMovieIds)].filter(id => !movieExclusions.includes(id));
 
-      // Remove duplicates
-      const uniqueDramaIds = [...new Set(allDramaIds)];
+      // Prepare final results interleaved
+      const result: { id: number, type: 'tv' | 'movie' }[] = [];
+      const maxLength = Math.max(uniqueTvIds.length, uniqueMovieIds.length);
 
-      // Filter out excluded dramas (watched or skipped)
-      const availableIds = uniqueDramaIds.filter(id => !allExcludedIds.includes(id));
-
-      console.log(`Available Korean dramas after filtering: ${availableIds.length}`);
-
-      if (availableIds.length === 0) {
-        console.log('No available dramas after filtering, returning fallback list');
-        // Fallback to a basic list if no dramas are available
-        const fallbackDramas = [124834, 83097, 69050, 100757, 71712, 85552, 88329, 95479];
-        const fallbackAvailable = fallbackDramas.filter(id => !allExcludedIds.includes(id));
-        return fallbackAvailable.slice(0, Math.min(input.limit, fallbackAvailable.length));
+      for (let i = 0; i < maxLength; i++) {
+        if (uniqueTvIds[i]) result.push({ id: uniqueTvIds[i], type: 'tv' });
+        if (uniqueMovieIds[i]) result.push({ id: uniqueMovieIds[i], type: 'movie' });
+        if (result.length >= input.limit) break;
       }
 
-      // Return results. Since the user wants high rating first, we'll sort the aggregated pool by rating
-      // However, fetching 800 IDs and returning 30 is fine.
-      // Note: discover/tv with vote_average.desc already gives us the best ones first.
-
-      const result = availableIds.slice(0, input.limit);
-
-      console.log(`Returning ${result.length} Korean discover dramas (High Rating prioritized from 800+ pool)`);
+      console.log(`Returning ${result.length} discover items (${result.filter(r => r.type === 'tv').length} TV, ${result.filter(r => r.type === 'movie').length} Movie)`);
       return result;
 
     } catch (error) {
       console.error('Error in getDiscoverDramasProcedure:', error);
-      throw new Error('Failed to fetch discover dramas');
+      throw new Error('Failed to fetch discover content');
     }
   });
 
-// Procedure para pular um drama
+// Procedure para pular um drama ou filme
 export const skipDramaProcedure = protectedProcedure
   .input(z.object({
-    dramaId: z.number()
+    dramaId: z.number(),
+    mediaType: z.enum(['tv', 'movie']).default('tv')
   }))
   .mutation(async ({ ctx, input }) => {
     try {
@@ -123,21 +109,22 @@ export const skipDramaProcedure = protectedProcedure
         .upsert({
           user_id: ctx.user.id,
           drama_id: input.dramaId,
+          media_type: input.mediaType,
           skipped_at: new Date().toISOString(),
           expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() // 7 dias
         }, {
-          onConflict: 'user_id,drama_id'
+          onConflict: 'user_id,drama_id,media_type'
         });
 
       if (error) {
-        console.error('Error skipping drama:', error);
-        throw new Error('Failed to skip drama');
+        console.error('Error skipping item:', error);
+        throw new Error('Failed to skip item');
       }
 
       return { success: true };
     } catch (error) {
       console.error('Error in skipDramaProcedure:', error);
-      throw new Error('Failed to skip drama');
+      throw new Error('Failed to skip item');
     }
   });
 
