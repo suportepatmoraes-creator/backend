@@ -591,7 +591,8 @@ export const markEpisodeWatchedProcedure = protectedProcedure
     episodeNumber: z.number().min(1),
     episodeDurationMinutes: z.number().min(1).default(60),
     startedAt: z.string().datetime().optional(),
-    completedAt: z.string().datetime().optional()
+    completedAt: z.string().datetime().optional(),
+    mediaType: z.enum(['tv', 'movie']).default('tv')
   }))
   .mutation(async ({ input, ctx }) => {
     try {
@@ -599,7 +600,8 @@ export const markEpisodeWatchedProcedure = protectedProcedure
         userId: ctx.user.id,
         dramaId: input.dramaId,
         episodeNumber: input.episodeNumber,
-        episodeDurationMinutes: input.episodeDurationMinutes
+        episodeDurationMinutes: input.episodeDurationMinutes,
+        mediaType: input.mediaType
       });
 
       const completedAt = input.completedAt ? new Date(input.completedAt).toISOString() : new Date().toISOString();
@@ -620,6 +622,7 @@ export const markEpisodeWatchedProcedure = protectedProcedure
           .select('episodes_watched, watched_minutes, total_episodes, total_runtime_minutes')
           .eq('user_id', ctx.user.id)
           .eq('drama_id', input.dramaId)
+          .eq('media_type', input.mediaType)
           .single();
 
         if (getDramaError) {
@@ -639,7 +642,8 @@ export const markEpisodeWatchedProcedure = protectedProcedure
             updated_at: new Date().toISOString()
           })
           .eq('user_id', ctx.user.id)
-          .eq('drama_id', input.dramaId);
+          .eq('drama_id', input.dramaId)
+          .eq('media_type', input.mediaType);
 
         if (updateError) {
           console.error('Error updating drama list (fallback):', updateError);
@@ -659,10 +663,11 @@ export const markEpisodeWatchedProcedure = protectedProcedure
           episode_duration_minutes: input.episodeDurationMinutes,
           watch_started_at: startedAt,
           watch_completed_at: completedAt,
+          media_type: input.mediaType,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         }, {
-          onConflict: 'user_id,drama_id,episode_number'
+          onConflict: 'user_id,drama_id,media_type,episode_number'
         });
 
       if (historyError) {
@@ -675,7 +680,8 @@ export const markEpisodeWatchedProcedure = protectedProcedure
         .from('episode_watch_history')
         .select('episode_number, episode_duration_minutes')
         .eq('user_id', ctx.user.id)
-        .eq('drama_id', input.dramaId);
+        .eq('drama_id', input.dramaId)
+        .eq('media_type', input.mediaType);
 
       if (countError) {
         console.error('Error counting watched episodes:', countError);
@@ -695,7 +701,8 @@ export const markEpisodeWatchedProcedure = protectedProcedure
           updated_at: new Date().toISOString()
         })
         .eq('user_id', ctx.user.id)
-        .eq('drama_id', input.dramaId);
+        .eq('drama_id', input.dramaId)
+        .eq('media_type', input.mediaType);
 
       if (updateError) {
         console.error('Error updating drama list:', updateError);
@@ -727,7 +734,8 @@ export const completeDramaWithDateRangeProcedure = protectedProcedure
     posterPath: z.string().optional(),
     posterImage: z.string().optional(),
     dramaYear: z.number().optional(),
-    totalRuntimeMinutes: z.number().optional()
+    totalRuntimeMinutes: z.number().optional(),
+    mediaType: z.enum(['tv', 'movie']).default('tv')
   }))
   .mutation(async ({ input, ctx }) => {
     try {
@@ -738,7 +746,8 @@ export const completeDramaWithDateRangeProcedure = protectedProcedure
         startDate: input.startDate,
         endDate: input.endDate,
         episodeDurationMinutes: input.episodeDurationMinutes,
-        dramaCategory: input.dramaCategory
+        dramaCategory: input.dramaCategory,
+        mediaType: input.mediaType
       });
 
       // Use the database function to complete drama with date range
@@ -754,7 +763,8 @@ export const completeDramaWithDateRangeProcedure = protectedProcedure
         p_poster_path: input.posterPath,
         p_poster_image: input.posterImage,
         p_drama_year: input.dramaYear,
-        p_total_runtime_minutes: input.totalRuntimeMinutes
+        p_total_runtime_minutes: input.totalRuntimeMinutes,
+        p_media_type: input.mediaType
       });
 
       if (error) {
