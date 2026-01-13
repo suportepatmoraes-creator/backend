@@ -435,26 +435,26 @@ export const getUserStatsProcedure = protectedProcedure
       // Get basic stats from user_drama_lists
       const { data: watchingDramas } = await ctx.supabase
         .from('user_drama_lists')
-        .select('id, watched_minutes, total_runtime_minutes, drama_category')
+        .select('id, drama_id, media_type, watched_minutes, total_runtime_minutes, drama_category')
         .eq('user_id', targetUserId)
         .eq('list_type', 'watching');
 
       const { data: watchlistDramas } = await ctx.supabase
         .from('user_drama_lists')
-        .select('id')
+        .select('id, drama_id, media_type')
         .eq('user_id', targetUserId)
         .eq('list_type', 'watchlist');
 
       const { data: completedDramas } = await ctx.supabase
         .from('user_drama_lists')
-        .select('id, watched_minutes, total_runtime_minutes, drama_category, updated_at')
+        .select('id, drama_id, media_type, watched_minutes, total_runtime_minutes, drama_category, updated_at')
         .eq('user_id', targetUserId)
         .eq('list_type', 'completed');
 
       // Get episode watch history for detailed analytics
       const { data: episodeHistory } = await ctx.supabase
         .from('episode_watch_history')
-        .select('episode_number, episode_duration_minutes, watched_at, drama_id')
+        .select('episode_number, episode_duration_minutes, watched_at, drama_id, media_type')
         .eq('user_id', targetUserId)
         .order('watched_at', { ascending: false });
 
@@ -555,7 +555,8 @@ export const getUserStatsProcedure = protectedProcedure
         time_data: timeData,
         genre_data: genrePercentages,
         recent_completions: completedDramas?.slice(0, 5).map(drama => ({
-          drama_id: drama.id,
+          drama_id: drama.drama_id,
+          media_type: drama.media_type,
           completed_at: drama.updated_at
         })) || [],
         created_at: new Date().toISOString(),
