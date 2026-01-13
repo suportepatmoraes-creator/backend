@@ -41,6 +41,8 @@ export const getDiscoverDramasProcedure = protectedProcedure
       const tvExclusions = [...excludedTvIds, ...skippedTvIds];
       const movieExclusions = [...excludedMovieIds, ...skippedMovieIds];
 
+      console.log(`Exclusions - TV: ${tvExclusions.length}, Movie: ${movieExclusions.length}`);
+
       const tmdbApiKey = '8265bd1679663a7ea12ac168da84d2e8';
       let allTvIds: number[] = [];
       let allMovieIds: number[] = [];
@@ -49,7 +51,7 @@ export const getDiscoverDramasProcedure = protectedProcedure
       for (let page = 1; page <= 10; page++) {
         try {
           const [topRated, popular] = await Promise.all([
-            fetch(`https://api.themoviedb.org/3/discover/tv?api_key=${tmdbApiKey}&sort_by=vote_average.desc&page=${page}&vote_count.gte=10&with_runtime.gte=10`).then(r => r.json()),
+            fetch(`https://api.themoviedb.org/3/discover/tv?api_key=${tmdbApiKey}&sort_by=vote_average.desc&page=${page}`).then(r => r.json()),
             fetch(`https://api.themoviedb.org/3/discover/tv?api_key=${tmdbApiKey}&sort_by=popularity.desc&page=${page}`).then(r => r.json())
           ]);
           allTvIds.push(...(topRated.results?.map((d: any) => d.id) || []));
@@ -63,7 +65,7 @@ export const getDiscoverDramasProcedure = protectedProcedure
       for (let page = 1; page <= 10; page++) {
         try {
           const [topRated, popular] = await Promise.all([
-            fetch(`https://api.themoviedb.org/3/discover/movie?api_key=${tmdbApiKey}&sort_by=vote_average.desc&page=${page}&vote_count.gte=10`).then(r => r.json()),
+            fetch(`https://api.themoviedb.org/3/discover/movie?api_key=${tmdbApiKey}&sort_by=vote_average.desc&page=${page}`).then(r => r.json()),
             fetch(`https://api.themoviedb.org/3/discover/movie?api_key=${tmdbApiKey}&sort_by=popularity.desc&page=${page}`).then(r => r.json())
           ]);
           allMovieIds.push(...(topRated.results?.map((d: any) => d.id) || []));
