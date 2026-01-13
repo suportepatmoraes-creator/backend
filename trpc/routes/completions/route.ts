@@ -7,11 +7,12 @@ export const completeDramaProcedure = protectedProcedure
       dramaId: z.number(),
       dramaName: z.string(),
       totalRuntimeMinutes: z.number(),
+      mediaType: z.enum(['tv', 'movie']).optional().default('tv'),
     })
   )
   .mutation(async ({ ctx, input }) => {
     const { supabase, user } = ctx;
-    const { dramaId, dramaName, totalRuntimeMinutes } = input;
+    const { dramaId, dramaName, totalRuntimeMinutes, mediaType } = input;
 
     try {
       console.log('Completing drama for user:', user.id, 'Drama:', dramaId);
@@ -22,6 +23,7 @@ export const completeDramaProcedure = protectedProcedure
         .select('*')
         .eq('user_id', user.id)
         .eq('drama_id', dramaId)
+        .eq('media_type', mediaType)
         .single();
 
       if (fetchError || !dramaData) {
@@ -32,7 +34,7 @@ export const completeDramaProcedure = protectedProcedure
       // Update the drama to completed status with all episodes watched
       const finalWatchedMinutes = dramaData.total_runtime_minutes || totalRuntimeMinutes;
       console.log(`Completing drama: total_runtime_minutes=${dramaData.total_runtime_minutes}, input totalRuntimeMinutes=${totalRuntimeMinutes}, final=${finalWatchedMinutes}`);
-      
+
       const { error: updateError } = await supabase
         .from('user_drama_lists')
         .update({
@@ -116,11 +118,12 @@ export const checkDramaCompletionProcedure = protectedProcedure
   .input(
     z.object({
       dramaId: z.number(),
+      mediaType: z.enum(['tv', 'movie']).optional().default('tv'),
     })
   )
   .query(async ({ ctx, input }) => {
     const { supabase, user } = ctx;
-    const { dramaId } = input;
+    const { dramaId, mediaType } = input;
 
     try {
       const { data, error } = await supabase
@@ -128,6 +131,7 @@ export const checkDramaCompletionProcedure = protectedProcedure
         .select('*')
         .eq('user_id', user.id)
         .eq('drama_id', dramaId)
+        .eq('media_type', mediaType)
         .eq('list_type', 'completed')
         .single();
 
